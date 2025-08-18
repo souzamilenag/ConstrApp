@@ -32,6 +32,7 @@
     "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
+    "cross-env": "^10.0.0",
     "nodemon": "^3.1.9",
     "sequelize-cli": "^6.6.2"
   }
