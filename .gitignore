@@ -1,0 +1,26 @@
+# Arquivos de Sistema Operacional
+.DS_Store
+Thumbs.db
+
+# Arquivos de IDE e logs
+.vscode/
+.idea/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependências (NÃO devem ser enviadas)
+**/node_modules/
+
+# Arquivos de ambiente com segredos (NUNCA ENVIAR)
+**/.env
+**/.env.*
+!**/.env.example
+
+# Pastas de build/distribuição (geradas automaticamente)
+**/dist/
+**/build/
+**/coverage/
+
+# Outros
+.npm
