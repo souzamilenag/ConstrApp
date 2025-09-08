@@ -3,6 +3,7 @@ const Pagamentos = db.Pagamentos;
 const Compras = db.Compras;
 const Unidades = db.Unidades;
 const Contratos = db.Contratos;
+const Empreendimentos = db.Empreendimentos;
 const { sequelize } = require('../models');
 
 exports.getPagamentosDaCompra = async (req, res) => {
@@ -126,6 +127,72 @@ exports.criarIntencaoPagamento = async (req, res) => {
             return res.status(400).json({ message: 'Erro de validação.', errors: messages });
         }
         res.status(500).json({ message: 'Erro interno do servidor ao criar intenção de pagamento.' });
+    }
+};
+
+exports.confirmarPagamentoManual = async (req, res) => {
+    const { id: pagamentoId } = req.params;
+    const usuarioConstrutoraId = req.user.id;
+
+    const t = await sequelize.transaction();
+
+    try {
+        const pagamento = await Pagamentos.findByPk(pagamentoId, {
+            include: [{
+                model: Compras,
+                as: 'compra',
+                required: true,
+                include: [{
+                    model: Unidades, as: 'unidade', required: true, include: [{
+                        model: Empreendimentos, as: 'empreendimento', required: true, include: [{
+                            model: db.Construtoras, as: 'construtora', required: true,
+                            where: { usuario_id: usuarioConstrutoraId } // Valida propriedade
+                        }]
+                    }]
+                }]
+            }],
+            transaction: t
+        });
+
+        if (!pagamento) {
+            await t.rollback();
+            return res.status(404).json({ message: 'Pagamento não encontrado ou não pertence a um de seus empreendimentos.' });
+        }
+
+        if (pagamento.status === 'Confirmado') {
+             await t.rollback();
+             return res.status(400).json({ message: 'Este pagamento já foi confirmado.' });
+        }
+
+        pagamento.status = 'Confirmado';
+        pagamento.data_pagamento = new Date(); 
+        await pagamento.save({ transaction: t });
+        console.log(`Pagamento ${pagamento.id} confirmado manualmente.`);
+
+        const compra = pagamento.compra;
+        if (compra.status !== 'Concluída') {
+            compra.status = 'Concluída';
+            await compra.save({ transaction: t });
+            console.log(`Compra ${compra.id} atualizada para Concluída.`);
+
+            await Unidades.update(
+                { status: 'Vendido' },
+                { where: { id: compra.unidade_id }, transaction: t }
+            );
+            console.log(`Unidade ${compra.unidade_id} atualizada para Vendido.`);
+        }
+
+        await t.commit();
+
+        res.status(200).json({
+            message: 'Pagamento confirmado com sucesso!',
+            pagamento: pagamento.toJSON()
+        });
+
+    } catch (error) {
+        await t.rollback();
+        console.error(`Erro ao confirmar pagamento manual para ID ${pagamentoId}:`, error);
+        res.status(500).json({ message: 'Erro interno do servidor ao confirmar o pagamento.' });
     }
 };
 

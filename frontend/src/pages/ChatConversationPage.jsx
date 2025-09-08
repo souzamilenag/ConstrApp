@@ -8,7 +8,7 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
 function ChatConversationPage() {
     const { otherUserId: otherUserIdParam } = useParams();
-    const otherUserId = Number(otherUserIdParam); 
+    const otherUserId = Number(otherUserIdParam);
     const { user: currentUser, loading: authLoading } = useAuth();
     const navigate = useNavigate();
 
@@ -18,19 +18,19 @@ function ChatConversationPage() {
     const [loadingHistory, setLoadingHistory] = useState(true);
     const [error, setError] = useState('');
     const [isConnected, setIsConnected] = useState(false);
-    const messagesEndRef = useRef(null); 
+    const messagesEndRef = useRef(null);
     const fetchHistory = useCallback(async () => {
         if (!otherUserId) return;
         setLoadingHistory(true);
         setError('');
         try {
-             try {
-                 const userResponse = await api.get(`/users/public/${otherUserId}`);
-                 setOtherUserName(userResponse.data?.nome || `Usuário ${otherUserId}`);
-             } catch (userErr) {
-                 console.warn("Não foi possível buscar nome do outro usuário", userErr);
-                 setOtherUserName(`Usuário ${otherUserId}`);
-             }
+            try {
+                const userResponse = await api.get(`/users/profile/${otherUserId}`); // Usar a rota '/profile/:id'
+                setOtherUserName(userResponse.data?.nome || `Usuário ${otherUserId}`);
+            } catch (userErr) {
+                console.warn("Não foi possível buscar nome do outro usuário", userErr);
+                setOtherUserName(`Usuário ${otherUserId}`);
+            }
 
             const historyResponse = await api.get(`/chat/conversa/${otherUserId}`);
             setMessages(historyResponse.data?.mensagens || []);
@@ -43,88 +43,88 @@ function ChatConversationPage() {
         }
     }, [otherUserId]);
     const scrollToBottom = () => {
-         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
-     useEffect(scrollToBottom, [messages]);
+    useEffect(scrollToBottom, [messages]);
 
     useEffect(() => {
         if (authLoading || !currentUser) {
             return;
         }
 
-         if (!socket || !socket.connected) {
-             console.log("Conectando ao Socket.IO...");
-              socket = io(SOCKET_URL);
+        if (!socket || !socket.connected) {
+            console.log("Conectando ao Socket.IO...");
+            socket = io(SOCKET_URL);
 
-             socket.on('connect', () => {
+            socket.on('connect', () => {
                 console.log('Socket.IO Conectado:', socket.id);
                 setIsConnected(true);
                 socket.emit('identificar', currentUser.id);
                 if (otherUserId) {
-                     socket.emit('entrarSala', { remetenteId: currentUser.id, destinatarioId: otherUserId });
+                    socket.emit('entrarSala', { remetenteId: currentUser.id, destinatarioId: otherUserId });
                 }
-             });
+            });
 
-             socket.on('disconnect', () => {
+            socket.on('disconnect', () => {
                 console.log('Socket.IO Desconectado.');
                 setIsConnected(false);
-             });
+            });
 
-              socket.on('connect_error', (err) => {
-                 console.error('Socket.IO Erro de Conexão:', err.message);
-                 setError('Não foi possível conectar ao chat em tempo real.');
-                 setIsConnected(false);
-             });
+            socket.on('connect_error', (err) => {
+                console.error('Socket.IO Erro de Conexão:', err.message);
+                setError('Não foi possível conectar ao chat em tempo real.');
+                setIsConnected(false);
+            });
 
         } else {
-             console.log("Socket já conectado. Identificando e entrando na sala...");
-             setIsConnected(true);
-             socket.emit('identificar', currentUser.id);
-             if (otherUserId) {
+            console.log("Socket já conectado. Identificando e entrando na sala...");
+            setIsConnected(true);
+            socket.emit('identificar', currentUser.id);
+            if (otherUserId) {
                 socket.emit('entrarSala', { remetenteId: currentUser.id, destinatarioId: otherUserId });
-             }
+            }
         }
         const messageListener = (novaMensagem) => {
-             console.log("Socket.IO 'receberMensagem':", novaMensagem);
-             if (
+            console.log("Socket.IO 'receberMensagem':", novaMensagem);
+            if (
                 (novaMensagem.remetente_id === currentUser.id && novaMensagem.destinatario_id === otherUserId) ||
                 (novaMensagem.remetente_id === otherUserId && novaMensagem.destinatario_id === currentUser.id)
-             ) {
-                 setMessages((prevMessages) => [...prevMessages, novaMensagem]);
-             }
+            ) {
+                setMessages((prevMessages) => [...prevMessages, novaMensagem]);
+            }
         };
         socket.on('receberMensagem', messageListener);
 
         return () => {
-             console.log("Limpando listeners e saindo da sala...");
-             if (socket) {
-                 socket.off('receberMensagem', messageListener);
-             }
+            console.log("Limpando listeners e saindo da sala...");
+            if (socket) {
+                socket.off('receberMensagem', messageListener);
+            }
         };
 
-    }, [currentUser, otherUserId, authLoading]); 
+    }, [currentUser, otherUserId, authLoading]);
 
     useEffect(() => {
         fetchHistory();
     }, [fetchHistory]);
 
     const handleSendMessage = (e) => {
-         e.preventDefault();
-         if (!newMessage.trim() || !socket || !isConnected || !currentUser || !otherUserId) {
-             console.warn("Não é possível enviar: msg vazia, socket desconectado ou IDs faltando.");
-             return;
-         }
+        e.preventDefault();
+        if (!newMessage.trim() || !socket || !isConnected || !currentUser || !otherUserId) {
+            console.warn("Não é possível enviar: msg vazia, socket desconectado ou IDs faltando.");
+            return;
+        }
 
-         const messageData = {
-             remetenteId: currentUser.id,
-             destinatarioId: otherUserId,
-             mensagem: newMessage,
-         };
+        const messageData = {
+            remetenteId: currentUser.id,
+            destinatarioId: otherUserId,
+            mensagem: newMessage,
+        };
 
-         console.log("Enviando mensagem via Socket.IO:", messageData);
-         socket.emit('enviarMensagem', messageData);
-         setNewMessage('');
+        console.log("Enviando mensagem via Socket.IO:", messageData);
+        socket.emit('enviarMensagem', messageData);
+        setNewMessage('');
     };
 
     if (authLoading || loadingHistory) {
@@ -160,10 +160,10 @@ function ChatConversationPage() {
                             </div>
                         </div>
                     );
-                })} 
+                })}
                 <div ref={messagesEndRef} />
 
-            </div> 
+            </div>
 
             <form onSubmit={handleSendMessage} style={styles.inputArea}>
                 <input
@@ -177,20 +177,20 @@ function ChatConversationPage() {
                 <button
                     type="submit"
                     style={styles.sendButton}
-                    disabled={!isConnected || !newMessage.trim()} 
+                    disabled={!isConnected || !newMessage.trim()}
                 >
                     Enviar
                 </button>
-            </form> 
+            </form>
 
-        </div> 
-    ); 
-} 
+        </div>
+    );
+}
 
 const styles = {
     centerMessage: { textAlign: 'center', padding: '40px 20px', fontSize: '1.1em', color: '#555' },
     errorText: { color: 'red', textAlign: 'center', padding: '5px 0', fontSize: '0.9em' },
-    pageContainer: { },
+    pageContainer: {},
     chatContainer: {
         display: 'flex',
         flexDirection: 'column',
@@ -216,11 +216,11 @@ const styles = {
         textDecoration: 'none',
         color: '#007bff',
         fontWeight: 'bold',
-        fontSize: '1.2em' 
+        fontSize: '1.2em'
     },
     headerTitle: {
         margin: 0,
-        flexGrow: 1, 
+        flexGrow: 1,
         textAlign: 'center',
         fontSize: '1.1em'
     },
@@ -258,7 +258,7 @@ const styles = {
     messageBubble: (isMe) => ({
         padding: '8px 12px',
         borderRadius: '12px',
-        backgroundColor: isMe ? '#dcf8c6' : '#fff', 
+        backgroundColor: isMe ? '#dcf8c6' : '#fff',
         color: 'black',
         wordWrap: 'break-word',
         boxShadow: '0 1px 1px rgba(0,0,0,0.1)',
